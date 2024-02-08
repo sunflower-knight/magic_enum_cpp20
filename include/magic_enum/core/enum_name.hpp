@@ -1,74 +1,113 @@
-#pragma once
+#ifndef MAGIC_ENUM_CORE_NAME_HPP
+#define MAGIC_ENUM_CORE_NAME_HPP
 
-#include "string_view"
-
-#include "magic_enum/core/enum_concept.hpp"
-#include "magic_enum/core/core.hpp"
-#include "magic_enum/core/enum_index.hpp"
-#include "limits" //todo delete it ,  for debug use
+#include "magic_enum/core/concept.hpp"
 
 namespace magic_enum
 {
+    namespace detail
+    {
+        struct str_view{
+            const char* str_ = nullptr;
+            std::size_t size_ = 0;
+        };
+
+        template <auto V>
+        constexpr auto n() noexcept {
+            #if defined(MAGIC_ENUM_GET_ENUM_NAME_BUILTIN)
+            constexpr auto name_ptr = MAGIC_ENUM_GET_ENUM_NAME_BUILTIN(V);
+            auto name = name_ptr ? str_view{name_ptr, std::char_traits<char>::length(name_ptr)} : str_view{};
+            #elif defined(__clang__)
+            str_view name;
+            if constexpr(sizeof(__PRETTY_FUNCTION__) == sizeof(__FUNCTION__)) {
+                static_assert(always_false_v<decltype(V)>, "magic_enum::detail::n requires __PRETTY_FUNCTION__.");
+                return string_view{ };
+            }
+            else {
+                name.size_ = sizeof(__PRETTY_FUNCTION__) - 36;
+                name.str_ = __PRETTY_FUNCTION__ + 34;
+            }
+            if(name.size_ > 22 && name.str_[0] == '(' && name.str_[1] == 'a' && name.str_[10] == ' ' && name.str_[22] == ':') {
+                name.size_ -= 23;
+                name.str_ += 23;
+            }
+            if(name.str_[0] == '(' || name.str_[0] == '-' || (name.str_[0] >= '0' && name.str_[0] <= '9')) {
+                name = str_view{ };
+            }
+            #elif defined(__GNUC__)
+            auto name = str_view{__PRETTY_FUNCTION__, sizeof(__PRETTY_FUNCTION__) - 1};
+            if constexpr (sizeof(__PRETTY_FUNCTION__) == sizeof(__FUNCTION__)) {
+              static_assert(always_false_v<decltype(V)>, "magic_enum::detail::n requires __PRETTY_FUNCTION__.");
+                return string_view{ };
+            } else if (name.str_[name.size_ - 1] == ']') {
+              name.size_ -= 55;
+              name.str_ += 54;
+            } else {
+              name.size_ -= 40;
+              name.str_ += 37;
+            }
+            if (name.str_[0] == '(') {
+              name = str_view{};
+            }
+            #elif defined(_MSC_VER)
+            str_view name;
+            if((__FUNCSIG__[5] == '_' && __FUNCSIG__[35] != '(') || (__FUNCSIG__[5] == 'c' && __FUNCSIG__[41] != '(')) {
+                // CLI/C++ workaround (see https://github.com/Neargye/magic_enum/issues/284).
+                name.str_ = __FUNCSIG__;
+                name.str_ += 35;
+                name.size_ = sizeof(__FUNCSIG__) - 52;
+            }
+            #else
+                auto name = str_view{};
+            #endif
+            std::size_t p = 0;
+            for(std::size_t i = name.size_; i > 0; --i) {
+                if(name.str_[i] == ':') {
+                    p = i + 1;
+                    break;
+                }
+            }
+            if(p > 0) {
+                name.size_ -= p;
+                name.str_ += p;
+            }
+            return string_view(name.str_, name.size_);
+        }
+
+        template <Enum E , E V>
+        consteval auto enum_name_cus() noexcept {
+            constexpr auto custom = customize::enum_name<E>(V);
+            static_assert(std::is_same_v<Pure<decltype(custom)>,customize::customize_t>,
+                          "magic_enum::customize speciliztion requires customize_t type as return type.");
+            if constexpr(custom.tag == customize::detail::customize_tag::custom_tag) {
+                static_assert(!custom.name.empty(), "customize name should not use empty string") ;
+                return custom.name;
+            }
+            else if(custom.tag == customize::detail::customize_tag::invalid_tag) {
+                return std::string_view{ };
+            }
+            else {
+                return detail::n<V>();
+            }
+        }
+
+        template <typename E, E V>
+        constexpr auto enum_name_v = enum_name_cus<E,V>();
+    }
+
     /**
-     * @note This version is compile faster on the compile time.
-     * @note This version is not restricted to the enum_range limitation.
-     * @note This version static_assert for not valid enum value.
-     * @todo 传入的value的cvr是否会影响结果 -> 可能退化了
+     * @brief
+     * @note This version is compile faster + not restricted to the enum_range limitation + static_assert for not valid enum value.
      * @return name from static storage enum variable.
      */
     template <auto V>
-        requires Enum<decltype(V)>
-    [[nodiscard]]
-    constexpr std::string_view enum_name() noexcept
-    {
-        constexpr std::string_view name = detail::enum_name_raw<V>();
+    [[nodiscard]] consteval auto enum_name() noexcept {
+        using D = Pure<decltype(V)>;
+        static_assert(Enum<D>, "magic_enum::enum_name recept Enum value only");
+        constexpr std::string_view name = detail::enum_name_v<D,V>;
         static_assert(!name.empty(), "magic_enum::enum_name enum value does not have a name.");
         return name;
     }
-
-    template <auto V>
-        requires Enum<decltype(V)>
-    inline constexpr auto enum_name_v = detail::enum_name_raw<V>();
-
-    namespace detail
-    {
-        template <typename E, std::size_t... I>
-        consteval auto names_imp(std::index_sequence<I...>) noexcept
-        {
-            return std::array<std::string_view, sizeof...(I)>{{enum_name<values_v<E>[I]>()...}};
-        }
-
-        template <Enum E>
-        constexpr auto names_v = detail::names_imp<Pure<E>>(std::make_index_sequence<values_v<E>.size()>{}); //use count
-    }
-
-    /**
-     * @brief compile and runtime support
-     * @example Color color = Color::RED; auto color_name = magic_enum::enum_name(color); -> color_name -> "RED"
-     * @return name from enum value.If enum value does not have name or value out of range, returns empty string.
-     */
-    template <Enum E>
-    [[nodiscard]]
-    constexpr std::string_view enum_name(E value) noexcept
-    {
-        using D = Pure<E>;
-        static_assert(is_reflected_v<D>, "magic_enum requires enum implementation and valid max and min.");
-        if (std::optional<size_t> index = enum_index<D>(value); index.has_value())
-        {
-            return detail::names_v<D>[index.value()];
-        }
-        return {};
-    }
-
-    /**
-     * @return [const+reference] array<string_view, N> with all enum's reflected element's names sorted by enum value.
-     * @example constexpr auto color_names = magic_enum::enum_names<Color>(); color_names -> {"RED", "BLUE", "GREEN"} color_names[0] -> "RED"
-     * @return  array<string_view,N>
-     */
-    template <Enum E>
-    consteval const auto& enum_names() noexcept
-    {
-        using D = Pure<E>;
-        return detail::names_v<D>;
-    }
 }
+
+#endif // MAGIC_ENUM_CORE_NAME_HPP

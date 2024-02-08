@@ -48,10 +48,15 @@ message(STATUS "USE_CCACHE: ${USE_CCACHE}")
 
 # see more Information when compile
 option(CMAKE_VERBOSE_MAKEFILE "use ccache to faster compile when develop" ON)
+#
+
 
 include(CheckCXXCompilerFlag)
 
 # --------------------- GCC
+# report compile time
+add_compile_options(-ftime-report)
+
 
 # --------------------- Clang
 

@@ -27,8 +27,8 @@
 
 enum class Color : int { RED = -10, BLUE = 0, GREEN = 10 };
 
-template <typename E>
-auto to_integer(magic_enum::Enum<E> value) {
+template <magic_enum::Enum E>
+auto to_integer(E value) {
   // magic_enum::Enum<E> - C++17 Concept for enum type.
   return static_cast<magic_enum::underlying_type_t<E>>(value);
 }
@@ -55,10 +55,10 @@ int main() {
   }
 
   // Case insensitive enum_cast.
-  c2 = magic_enum::enum_cast<Color>("blue", magic_enum::case_insensitive);
-  if (c2.has_value()) {
-    std::cout << "BLUE = " << to_integer(c2.value()) << std::endl; // BLUE = 0
-  }
+  // c2 = magic_enum::enum_cast<Color>("blue", magic_enum::case_insensitive);
+  // if (c2.has_value()) {
+    // std::cout << "BLUE = " << to_integer(c2.value()) << std::endl; // BLUE = 0
+  // }
 
   // Integer value to enum value.
   auto c3 = magic_enum::enum_cast<Color>(10);

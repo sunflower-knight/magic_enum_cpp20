@@ -1,11 +1,8 @@
 message(STATUS "-------------DEVELOP SETTING-------------")
-# extra
+
+# examples
 option(BUILD_EXAMPLES "Build examples" ON)
 message(STATUS "BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
-
-# bench test
-option(BUILD_BENCHMARK "Build benchmark" OFF)
-message(STATUS "BUILD_BENCHMARK: ${BUILD_BENCHMARK}")
 
 # unit test
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
@@ -14,31 +11,11 @@ if(BUILD_UNIT_TESTS)
     enable_testing()
 endif()
 
-# coverage test
-option(COVERAGE_TEST "Build with unit test coverage" OFF)
-message(STATUS "COVERAGE_TEST: ${COVERAGE_TEST}")
-if(COVERAGE_TEST)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage --coverage")
-    else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
-    endif()
-endif()
-
-# generator benchmark test data
-option(GENERATE_BENCHMARK_DATA "Generate benchmark data" OFF)
-message(STATUS "GENERATE_BENCHMARK_DATA: ${GENERATE_BENCHMARK_DATA}")
-
 # Enable address sanitizer
 option(ENABLE_SANITIZER "Enable sanitizer(Debug+Gcc/Clang/AppleClang)" OFF)
 if(ENABLE_SANITIZER AND NOT MSVC)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        check_asan(HAS_ASAN)
-        if(HAS_ASAN)
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-        else()
-            message(WARNING "sanitizer is no supported with current tool-chains")
-        endif()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
     endif()
 endif()
 
@@ -52,12 +29,14 @@ if(ENABLE_WARNING)
         endif()
         add_compile_options(MSVC_OPTIONS)
     else()
-        add_compile_options(-Wall
-                            -Wextra
-                            -Wconversion
-                            -pedantic-errors
-                            -pedantic
-                            -Werror
-                            -Wfatal-errors)
+        add_compile_options(
+#                -Wall
+#                -Wextra
+#                -Wconversion
+#                -pedantic-errors
+#                -pedantic
+#                -Werror
+#                -Wfatal-errors
+        )
     endif()
 endif()

@@ -9,11 +9,7 @@ namespace magic_enum
      * @return number of enum's reflected and valid elements.
      */
     template <Enum E>
-    consteval size_t enum_count() noexcept
-    {
-        return values_v<E>.size();
+    consteval size_t enum_count() noexcept {
+        return values_v<Pure<E>>.size();
     }
-
-    template <Enum E>
-    constexpr size_t enum_count_v = values_v<E>.size();
 }
